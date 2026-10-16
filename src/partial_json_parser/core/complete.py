@@ -17,7 +17,8 @@ def fix(json_string: str, allow_partial: Union[Allow, int] = ALL):
 
 def _fix(json_string: str, allow: Allow, is_top_level=False):
     try:
-        result = complete_any(json_string.strip(), allow, is_top_level)
+        # Trailing whitespace can belong to an unfinished string.
+        result = complete_any(json_string.lstrip(), allow, is_top_level)
         if result is False:
             raise PartialJSON
 

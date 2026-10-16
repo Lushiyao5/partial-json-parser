@@ -1,10 +1,11 @@
 from itertools import accumulate
 from json import dumps
+from json import loads as standard_loads
 from math import isnan
 
 from hypothesis import given, settings
 from hypothesis.strategies import integers
-from pytest import raises
+from pytest import mark, raises
 from test_hypotheses import json
 
 from partial_json_parser import *
@@ -139,3 +140,35 @@ def test_consistency():
 def test_consistencies(json_string, allow):
     for json_string in accumulate(json_string):
         assert consistent(json_string, allow), f"{Allow(allow)!r} - {json_string}"
+
+
+@mark.parametrize("use_fast_fix", [True, False])
+@mark.parametrize(
+    "text, expected",
+    [
+        ('"hello ', "hello "),
+        ('"   ', "   "),
+        ('"hello\u00a0', "hello\u00a0"),
+        ('"hello\u3000', "hello\u3000"),
+        ('["hello ', ["hello "]),
+        ('[0, "hello ', [0, "hello "]),
+        ('{"key": "hello ', {"key": "hello "}),
+        ('{"ok": true, "key": "hello ', {"ok": True, "key": "hello "}),
+        ('[{"key": "hello ', [{"key": "hello "}]),
+    ],
+)
+def test_partial_string_keeps_trailing_whitespace(text, expected, use_fast_fix):
+    assert parse_json(text, use_fast_fix=use_fast_fix) == expected
+
+
+@mark.parametrize("use_fast_fix", [True, False])
+@mark.parametrize("text", ['"hello "', '["hello "]', '{"key": "hello "}'])
+def test_complete_string_with_trailing_json_whitespace(text, use_fast_fix):
+    text += " \t\r\n"
+    assert parse_json(text, use_fast_fix=use_fast_fix) == standard_loads(text)
+
+
+@mark.parametrize("use_fast_fix", [True, False])
+@mark.parametrize("text, allow, expected", [('["hello ', ARR, []), ('{"key": "hello ', OBJ, {})])
+def test_string_whitespace_does_not_enable_partial_strings(text, allow, expected, use_fast_fix):
+    assert parse_json(text, allow, use_fast_fix=use_fast_fix) == expected
